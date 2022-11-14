@@ -14,4 +14,5 @@ import lombok.NoArgsConstructor;
 public class RequestDTO {
 
 	private MultipartFile file;
+	
 }

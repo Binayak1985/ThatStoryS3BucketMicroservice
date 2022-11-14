@@ -3,26 +3,20 @@ package com.startup.thatstory_multimedia.services;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-
+import com.startup.thatstory_multimedia.awsutility.S3Util;
 import com.startup.thatstory_multimedia.bean.AWSS3Client;
 import com.startup.thatstory_multimedia.customexception.CustomS3Exception;
 import com.startup.thatstory_multimedia.dto.ResponseDTO;
 import com.startup.thatstory_multimedia.properties.S3ClientProperties;
 
-import software.amazon.awssdk.awscore.exception.AwsServiceException;
-import software.amazon.awssdk.core.exception.SdkClientException;
-import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
-import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.services.s3.model.PutObjectResponse;
-import software.amazon.awssdk.services.s3.model.S3Exception;
+
 
 @Service
 @EnableConfigurationProperties(S3ClientProperties.class)
@@ -31,35 +25,50 @@ public class AWSService {
 	@Autowired
 	S3ClientProperties s3clientproperties;
 
-	String BUCKET = "mytestbucket";
 	
-	public ResponseDTO upload(MultipartFile file, AWSS3Client awss3client) throws S3Exception, AwsServiceException, SdkClientException, IOException,S3Exception {
+	public ResponseDTO upload(String bucket_name, String foldername, MultipartFile file, AWSS3Client awss3client) throws IOException {
 
+//		S3Client s3client = awss3client.getS3Client(s3clientproperties);
+		System.out.println(" folder name is "+foldername);
+		
+		if(S3Util.createBucket(bucket_name)!=null)
+		{
+		
 		InputStream inputStream = file.getInputStream();
-		String filename = file.getOriginalFilename();
-		S3Client s3client = awss3client.getS3Client(s3clientproperties);
-		PutObjectRequest request = PutObjectRequest.builder().bucket(BUCKET).key(filename).build();
+		
+//		PutObjectRequest request = PutObjectRequest.bucket(bucket_name).key(foldername+"/"+file.getOriginalFilename()).build();
+		   Map<String, String> metadata = new HashMap<>();
+           metadata.put("src", "UI");
 
-		PutObjectResponse s3response = s3client.putObject(request, RequestBody.fromInputStream(inputStream, inputStream.available()));
+		boolean isSuccessful = S3Util.addObject(bucket_name,foldername+"/"+file.getOriginalFilename() , file.getInputStream());
 
-		if(s3response.sdkHttpResponse().isSuccessful())
+		if(isSuccessful)
 		{
-		return ResponseDTO.builder().bucketname(BUCKET).filename(filename).timestamp(new Date()).build();
+		
+		return ResponseDTO.builder().bucketname(bucket_name).filename(foldername).timestamp(new Date()).build();
 		}
 		else
 		{
 		throw new CustomS3Exception("S3 error: Unable to upload message. Contact Administrator");	
 		}
+		}
+		else
+		{
+			throw new CustomS3Exception("S3 error: Unable to create S3 bucket to upload file. Contact Administrator");
+		}
 	}
 
-	public ResponseDTO delete(String filename, AWSS3Client awss3client) throws S3Exception, AwsServiceException, SdkClientException, IOException {
-		S3Client s3client = awss3client.getS3Client(s3clientproperties);
-		DeleteObjectRequest request = DeleteObjectRequest.builder().bucket(BUCKET).key(filename).build();
-		DeleteObjectResponse s3response = s3client.deleteObject(request);	
+	public ResponseDTO delete(String bucketname, String foldername, String filename, AWSS3Client awss3client) {
+//		   AmazonS3 s3Client = AmazonS3ClientBuilder.standard()
+//                   .withCredentials(new ProfileCredentialsProvider())
+//                   .withRegion(Regions.US_EAST_1)
+//                   .build();
+//		DeleteObjectRequest request = DeleteObjectRequest.builder().bucket(bucketname).key(foldername+"/"+filename).build();
+		boolean isDeleted= S3Util.deleteObject(bucketname,foldername+"/"+filename);	
 
-		if(s3response.sdkHttpResponse().isSuccessful())
+		if(isDeleted)
 		{
-			return ResponseDTO.builder().bucketname(BUCKET).filename(filename).timestamp(new Date()).build();
+			return ResponseDTO.builder().bucketname(bucketname).filename(filename).timestamp(new Date()).build();
 		}
 		else
 		{
@@ -68,4 +77,5 @@ public class AWSService {
 
 	}
 
+	
 }
